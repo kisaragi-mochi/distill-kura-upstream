@@ -157,8 +157,13 @@ def test_every_wal_payload_and_the_intent_are_fsynced_before_the_rename(tmp_path
     s = make(tmp_path)
     synced: list[str] = []
     real = os.fsync
-    monkeypatch.setattr(os, "fsync", lambda fd: (synced.append(os.readlink(f"/proc/self/fd/{fd}")),
-                                                 real(fd))[1])
+    def record_sync(fd):
+        stat = os.fstat(fd)
+        # Resolve by inode so the assertion also works without Linux /proc.
+        synced.append(next(str(p) for p in tmp_path.rglob("*")
+                           if (p.stat().st_dev, p.stat().st_ino) == (stat.st_dev, stat.st_ino)))
+        return real(fd)
+    monkeypatch.setattr(os, "fsync", record_sync)
     s.remember_direct("fact", "the trigger line", "the body")
     files = [p for p in synced if not os.path.isdir(p)]
     # both WAL payloads (the memory and the index), the intent, and both canonical

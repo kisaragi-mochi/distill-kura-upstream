@@ -248,6 +248,8 @@ def test_a_wal_intent_naming_a_store_kept_file_is_quarantined(tmp_path):
     import hashlib
     import json
     s = make(tmp_path)
+    memory = tmp_path / "t" / "memory.md"
+    original_memory = memory.read_bytes() if memory.exists() else None
     charter = os.path.join(s.path, "charter.md")
     with open(charter, "w", encoding="utf-8") as f:
         f.write("the real charter\n")
@@ -282,7 +284,7 @@ def test_a_wal_intent_naming_a_store_kept_file_is_quarantined(tmp_path):
     assert rep["replayed"] == []
     assert rep["quarantined"] == [f"0000000000000000000{i}-1" for i in (1, 2, 3, 4, 5, 9)]
     assert open(charter, encoding="utf-8").read() == "the real charter\n"
-    assert not os.path.exists(os.path.join(s.path, "memory.md"))
+    assert (memory.read_bytes() if memory.exists() else None) == original_memory
     assert s.revision() != 99                       # the counter did not honour the promise
     assert s.doctor()["broken_wal"] == rep["quarantined"]     # loud, not swept up
     assert not os.path.exists(os.path.join(tmp_path, "x.md"))     # nothing escaped
